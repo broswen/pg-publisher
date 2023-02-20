@@ -1,0 +1,51 @@
+
+version: "3.9"
+services:
+  publisher:
+    build:
+      context: .
+      dockerfile: Dockerfile.publisher
+    depends_on:
+      - broker
+      - postgres
+    command: sh -c "
+      sleep 4 &&
+      ./bin/publisher"
+    environment:
+      BROKERS: broker:9092
+      PUBLISHER_TOPIC: pg-publisher.data
+      DSN: postgres://postgres:password@postgres:5432/postgres
+      TABLE_NAME: data
+      VERSION_COLUMN: version
+      ID: pg-publisher-data
+  broker:
+    container_name: broker
+    hostname: broker
+    image: bitnami/kafka:latest
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: "1"
+      KAFKA_ENABLE_KRAFT: "yes"
+      KAFKA_CFG_PROCESS_ROLES: broker,controller
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+      KAFKA_CFG_LISTENERS: INTERNAL://:9092,CONTROLLER://:9093,LOCAL://:29092
+      KAFKA_CFG_ADVERTISED_LISTENERS: INTERNAL://broker:9092,LOCAL://localhost:29092
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 1@127.0.0.1:9093
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,LOCAL:PLAINTEXT
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
+  postgres:
+    container_name: postgres
+    hostname: postgres
+    build:
+      context: sql
+      dockerfile: Dockerfile
+    environment:
+      POSTGRES_PASSWORD: password
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
