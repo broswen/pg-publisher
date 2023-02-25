@@ -8,7 +8,12 @@ create table pg_publisher(
 
 create table data (
     id uuid default uuid_generate_v4() primary key,
-    data text not null,
+    a text not null default 'test',
+    b integer not null default 123,
+    c float not null default 123.456,
+    d bool not null default true,
+    e VARCHAR(16) not null default 'test',
+    f TIMESTAMPTZ not null default now(),
     version bigint not null default 0
 );
 

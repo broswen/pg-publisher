@@ -1,4 +1,3 @@
-
 version: "3.9"
 services:
   publisher:
@@ -18,6 +17,8 @@ services:
       TABLE_NAME: data
       VERSION_COLUMN: version
       ID: pg-publisher-data
+      DEFAULT_VERSION: 0
+      BATCH_SIZE: 10
   broker:
     container_name: broker
     hostname: broker

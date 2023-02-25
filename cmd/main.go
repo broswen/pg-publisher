@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 )
@@ -66,6 +67,27 @@ func main() {
 		log.Fatal().Msgf("version column is empty")
 	}
 
+	batchSize := os.Getenv("BATCH_SIZE")
+	if batchSize == "" {
+		log.Fatal().Msgf("batch size is empty")
+	}
+	batchSizeVal, err := strconv.ParseInt(batchSize, 10, 64)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("unable to parse batch size")
+	}
+
+	defaultVersion := os.Getenv("DEFAULT_VERSION")
+	var defaultVersionVal int64
+	if defaultVersion == "" {
+		defaultVersionVal = 0
+	} else {
+		temp, err := strconv.ParseInt(defaultVersion, 10, 64)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("unable to parse default version")
+		}
+		defaultVersionVal = temp
+	}
+
 	lockname := os.Getenv("LOCK_NAME")
 	namespace := os.Getenv("NAMESPACE")
 
@@ -106,7 +128,7 @@ func main() {
 		log.Fatal().Err(err).Msg("could not create publisher store")
 	}
 
-	changePublisher, err := publisher.NewKafkaPublisher(id, 0, tableName, versionColumn, changesProducer, store)
+	changePublisher, err := publisher.NewKafkaPublisher(id, defaultVersionVal, batchSizeVal, tableName, versionColumn, changesProducer, store)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	var leading chan struct{}

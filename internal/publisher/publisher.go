@@ -16,13 +16,13 @@ type KafkaPublisher struct {
 	id                   string
 	lastPublishedVersion int64
 	store                Store
-	limit                int64
+	batchSize            int64
 	producer             producer.Row
 	tableName            string
 	versionColumn        string
 }
 
-func NewKafkaPublisher(id string, defaultVersion int64, tableName, versionColumn string, producer producer.Row, store Store) (*KafkaPublisher, error) {
+func NewKafkaPublisher(id string, defaultVersion, batchSize int64, tableName, versionColumn string, producer producer.Row, store Store) (*KafkaPublisher, error) {
 	if id == "" {
 		return nil, errors.New("publisher id is empty")
 	}
@@ -33,7 +33,7 @@ func NewKafkaPublisher(id string, defaultVersion int64, tableName, versionColumn
 		producer:             producer,
 		tableName:            tableName,
 		versionColumn:        versionColumn,
-		limit:                25,
+		batchSize:            batchSize,
 	}, nil
 }
 
@@ -46,6 +46,7 @@ func (p *KafkaPublisher) Run(ctx context.Context) error {
 			return errors.New("unable to get last published version")
 		}
 		//if version not found in DB, use defaultVersion
+		log.Warn().Int64("lastPublishedVersion", p.lastPublishedVersion).Msg("could not get last published version, using default")
 		lastPublishedVersion = p.lastPublishedVersion
 	} else {
 		log.Info().Int64("lastPublishedVersion", lastPublishedVersion).Msg("got last published version")
@@ -70,39 +71,44 @@ func (p *KafkaPublisher) Run(ctx context.Context) error {
 			}
 			log.Info().Str("id", p.id).Msg("change detected")
 
-			rows, err := p.store.ListFromVersion(ctx, p.tableName, p.versionColumn, p.lastPublishedVersion, p.limit)
-			if err != nil {
-				log.Error().Err(err).Str("id", p.id).Msg("error listing changes")
-				continue
-			}
-			for _, row := range rows {
-				err = p.producer.Submit(row)
+			more := true
+			for more {
+				rows, err := p.store.ListFromVersion(ctx, p.tableName, p.versionColumn, p.lastPublishedVersion, p.batchSize)
 				if err != nil {
-					log.Error().Err(err).Str("id", p.id).Msg("error submitting row")
-					PublishErrors.Inc()
-					break
+					log.Error().Err(err).Str("id", p.id).Msg("error listing changes")
+					continue
 				}
-				version, ok := row[p.versionColumn]
-				if !ok {
-					log.Error().Err(err).Str("id", p.id).Str("versionColumn", p.versionColumn).Msg("version column not found on row")
-					PublishErrors.Inc()
-					break
+				//continue loop if batch size wasn't full (potentially more in table)
+				more = int64(len(rows)) == p.batchSize
+				for _, row := range rows {
+					err = p.producer.Submit(row)
+					if err != nil {
+						log.Error().Err(err).Str("id", p.id).Msg("error submitting row")
+						PublishErrors.Inc()
+						break
+					}
+					version, ok := row[p.versionColumn]
+					if !ok {
+						log.Error().Err(err).Str("id", p.id).Str("versionColumn", p.versionColumn).Msg("version column not found on row")
+						PublishErrors.Inc()
+						break
+					}
+
+					if val, ok := version.(int64); ok {
+						p.lastPublishedVersion = val
+					} else {
+						log.Error().Err(err).Str("id", p.id).Interface("version", val).Msg("version column value not int64")
+						PublishErrors.Inc()
+						break
+					}
 				}
 
-				if val, ok := version.(int64); ok {
-					p.lastPublishedVersion = val
-				} else {
-					log.Error().Err(err).Str("id", p.id).Interface("version", val).Msg("version column value not int64")
-					PublishErrors.Inc()
-					break
+				LastPublishedVersion.Set(float64(p.lastPublishedVersion))
+				err = p.store.SetLastPublishedVersion(ctx, p.id, p.lastPublishedVersion)
+				if err != nil {
+					log.Error().Err(err).Str("id", p.id).Msg("error setting last published version")
+					continue
 				}
-			}
-
-			LastPublishedVersion.Set(float64(p.lastPublishedVersion))
-			err = p.store.SetLastPublishedVersion(ctx, p.id, p.lastPublishedVersion)
-			if err != nil {
-				log.Error().Err(err).Str("id", p.id).Msg("error setting last published version")
-				continue
 			}
 
 		case <-ctx.Done():
