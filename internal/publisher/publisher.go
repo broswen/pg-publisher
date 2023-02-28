@@ -59,6 +59,7 @@ func (p *KafkaPublisher) Run(ctx context.Context) error {
 	for {
 		select {
 		case <-ticker.C:
+			start := time.Now()
 			log.Info().Str("id", p.id).Msg("checking latest version")
 			latestVersion, err := p.store.GetLatestVersion(ctx, p.tableName, p.versionColumn)
 			if err != nil {
@@ -101,6 +102,7 @@ func (p *KafkaPublisher) Run(ctx context.Context) error {
 						PublishErrors.Inc()
 						break
 					}
+					ProvisionedVersions.Inc()
 				}
 
 				LastPublishedVersion.Set(float64(p.lastPublishedVersion))
@@ -110,6 +112,8 @@ func (p *KafkaPublisher) Run(ctx context.Context) error {
 					continue
 				}
 			}
+			TickLatency.Observe(float64(time.Since(start).Milliseconds()))
+			Ticks.Inc()
 
 		case <-ctx.Done():
 			log.Info().Str("id", p.id).Msg("stopping publisher")
