@@ -58,6 +58,5 @@ func (p *KafkaProducer) Submit(row map[string]interface{}) error {
 		log.Err(err).Str("producer_id", p.id).Str("topic", p.topic).Str("broker", p.broker).Msgf("couldn't submit row")
 		return err
 	}
-	log.Info().Str("producer_id", p.id).Str("topic", p.topic).Str("broker", p.broker).Msgf("submitted row")
 	return nil
 }

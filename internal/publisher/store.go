@@ -47,7 +47,7 @@ func (m *MockStore) ListFromVersion(ctx context.Context, tableName, versionColum
 }
 
 func (store *PostgresStore) ListFromVersion(ctx context.Context, tableName, versionColumn string, startVersion, limit int64) ([]map[string]interface{}, error) {
-	query := fmt.Sprintf("SELECT * FROM %[1]s WHERE %[2]s > $1 ORDER BY %[1]s ASC LIMIT $2;", tableName, versionColumn)
+	query := fmt.Sprintf("SELECT * FROM %[1]s WHERE %[2]s > $1 ORDER BY %[2]s ASC LIMIT $2;", tableName, versionColumn)
 	queryRows, err := store.db.Query(ctx, query, startVersion, limit)
 	err = db.PgError(err)
 	if err != nil {

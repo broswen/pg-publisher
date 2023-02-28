@@ -19,6 +19,8 @@ services:
       ID: pg-publisher-data
       DEFAULT_VERSION: 0
       BATCH_SIZE: 10
+    ports:
+      - "8081:8081"
   broker:
     container_name: broker
     hostname: broker

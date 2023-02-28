@@ -66,11 +66,11 @@ func (p *KafkaPublisher) Run(ctx context.Context) error {
 				log.Error().Err(err).Str("id", p.id).Str("tableName", p.tableName).Str("versionColumn", p.versionColumn).Msg("error getting latest version")
 				continue
 			}
-			if p.lastPublishedVersion >= latestVersion {
+			if latestVersion <= p.lastPublishedVersion {
 				log.Info().Str("id", p.id).Int64("version", p.lastPublishedVersion).Msg("no changes")
 				continue
 			}
-			log.Info().Str("id", p.id).Msg("change detected")
+			log.Info().Str("id", p.id).Int64("latestVersion", latestVersion).Int64("lastPublishedVersion", lastPublishedVersion).Msg("change detected")
 
 			more := true
 			for more {
@@ -81,6 +81,7 @@ func (p *KafkaPublisher) Run(ctx context.Context) error {
 				}
 				//continue loop if batch size wasn't full (potentially more in table)
 				more = int64(len(rows)) == p.batchSize
+				log.Info().Str("id", p.id).Int("rows", len(rows)).Bool("more", more).Msg("submitting rows")
 				for _, row := range rows {
 					err = p.producer.Submit(row)
 					if err != nil {
@@ -111,6 +112,7 @@ func (p *KafkaPublisher) Run(ctx context.Context) error {
 					log.Error().Err(err).Str("id", p.id).Msg("error setting last published version")
 					continue
 				}
+				log.Info().Str("id", p.id).Int64("lastPublishedVersion", p.lastPublishedVersion).Msg("persisting last published version")
 			}
 			TickLatency.Observe(float64(time.Since(start).Milliseconds()))
 			Ticks.Inc()
