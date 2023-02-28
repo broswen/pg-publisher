@@ -1,0 +1,125 @@
+---
+# Source: pg-publisher/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pg-publisher
+  namespace: pg-publisher
+  labels:
+    helm.sh/chart: pg-publisher-0.1.0
+    app.kubernetes.io/name: pg-publisher
+    app.kubernetes.io/instance: pg-publisher
+    app.kubernetes.io/version: "1.16.0"
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: pg-publisher/templates/secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pg-publisher
+  namespace: pg-publisher
+  labels:
+    helm.sh/chart: pg-publisher-0.1.0
+    app.kubernetes.io/name: pg-publisher
+    app.kubernetes.io/instance: pg-publisher
+    app.kubernetes.io/version: "1.16.0"
+    app.kubernetes.io/managed-by: Helm
+data:
+  DSN: cG9zdGdyZXM6Ly9wb3N0Z3JlczpwYXNzd29yZEBwb3N0Z3Jlcy5wb3N0Z3Jlcy5zdmMuY2x1c3Rlci5sb2NhbDo1NDMyL2hlYWx0aGNoZWNrcg==
+---
+# Source: pg-publisher/templates/config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pg-publisher
+  namespace: pg-publisher
+  labels:
+    helm.sh/chart: pg-publisher-0.1.0
+    app.kubernetes.io/name: pg-publisher
+    app.kubernetes.io/instance: pg-publisher
+    app.kubernetes.io/version: "1.16.0"
+    app.kubernetes.io/managed-by: Helm
+data:
+  BATCH_SIZE: "10"
+  BROKERS: kafka-clusterip.kafka.svc.cluster.local:9092
+  DEFAULT_VERSION: "0"
+  ID: pg-publisher-data
+  PUBLISHER_TOPIC: pg-publisher.data
+  TABLE_NAME: data
+  VERSION_COLUMN: version
+---
+# Source: pg-publisher/templates/serviceaccount.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pg-publisher
+  namespace: pg-publisher
+  labels:
+    helm.sh/chart: pg-publisher-0.1.0
+    app.kubernetes.io/name: pg-publisher
+    app.kubernetes.io/instance: pg-publisher
+    app.kubernetes.io/version: "1.16.0"
+    app.kubernetes.io/managed-by: Helm
+rules:
+  - apiGroups: [ "coordination.k8s.io" ]
+    resources: [ "leases" ]
+    verbs: [ "get", "watch", "list", "put", "create", "delete", "patch", "update" ]
+---
+# Source: pg-publisher/templates/serviceaccount.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pg-publisher
+  namespace: pg-publisher
+  labels:
+    helm.sh/chart: pg-publisher-0.1.0
+    app.kubernetes.io/name: pg-publisher
+    app.kubernetes.io/instance: pg-publisher
+    app.kubernetes.io/version: "1.16.0"
+    app.kubernetes.io/managed-by: Helm
+subjects:
+  - kind: ServiceAccount
+    name: pg-publisher
+    namespace: pg-publisher
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: pg-publisher
+---
+# Source: pg-publisher/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pg-publisher
+  namespace: pg-publisher
+  labels:
+    helm.sh/chart: pg-publisher-0.1.0
+    app.kubernetes.io/name: pg-publisher
+    app.kubernetes.io/instance: pg-publisher
+    app.kubernetes.io/version: "1.16.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: pg-publisher
+      app.kubernetes.io/instance: pg-publisher
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: pg-publisher
+        app.kubernetes.io/instance: pg-publisher
+    spec:
+      serviceAccountName: pg-publisher
+      securityContext:
+        {}
+      containers:
+        - name: pg-publisher
+          securityContext:
+            {}
+          image: "pg-publisher:1.16.0"
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              cpu: "1"
+              memory: 256Mi
